@@ -3,13 +3,20 @@ Imports System.IO
 Imports Newtonsoft.Json
 Public Class CCOVID
     Implements ICOVID
+
     Dim request As HttpWebRequest
     Dim response As HttpWebResponse = Nothing
     Dim reader As StreamReader
     Dim jsonString As String
-    Private TotalCasesValue As Integer
+    Private AntudDate As String 'mis kuupaeval andmeid kuvada
+    Private AntudMaakond As String 'mis maakonnast andmeid kuvada
+
+    Private TotalCasesValue As Integer 'anname tegeliku vaartuse
     Private DailyCasesValue As Integer
-    Private AntudDate As String
+    Private TotalCasesLast14DValue As Integer
+    Private PerPopulationValue As Integer
+    Private NextDayValue As Integer
+
     Public Property TotalCases As Integer Implements ICOVID.TotalCases
         Get
             Return TotalCasesValue 'atribuudi kusimusel tagasta see
@@ -19,14 +26,6 @@ Public Class CCOVID
         End Set
     End Property
 
-    Public Property LastStatisticsDate As String Implements ICOVID.LastStatisticsDate
-        Get
-            Throw New NotImplementedException()
-        End Get
-        Set(value As String)
-            Throw New NotImplementedException()
-        End Set
-    End Property
 
     Public Property DailyCases As Integer Implements ICOVID.DailyCases
         Get
@@ -39,71 +38,67 @@ Public Class CCOVID
 
     Public Property TotalCasesLast14D As Integer Implements ICOVID.TotalCasesLast14D
         Get
-            Throw New NotImplementedException()
+            Return TotalCasesLast14DValue
         End Get
         Set(value As Integer)
-            Throw New NotImplementedException()
+            TotalCasesLast14DValue = value
         End Set
     End Property
 
     Public Property PerPopulation As Double Implements ICOVID.PerPopulation
         Get
-            Throw New NotImplementedException()
+            Return PerPopulationValue
         End Get
         Set(value As Double)
-            Throw New NotImplementedException()
+            PerPopulationValue = value
+
         End Set
     End Property
 
-    Public Property StatisticsDate As String Implements ICOVID.StatisticsDate
+    Public Property NextDay As Integer Implements ICOVID.NextDay
         Get
-            Throw New NotImplementedException()
+            Return NextDayValue
         End Get
-        Set(value As String)
-            Throw New NotImplementedException()
+        Set(value As Integer)
+            NextDayValue = value
         End Set
     End Property
 
-    Public Property Country As String Implements ICOVID.Country
-        Get
-            Throw New NotImplementedException()
-        End Get
-        Set(value As String)
-            Throw New NotImplementedException()
-        End Set
-    End Property
-
-    Public Property County As String Implements ICOVID.County
-        Get
-            Throw New NotImplementedException()
-        End Get
-        Set(value As String)
-            Throw New NotImplementedException()
-        End Set
-    End Property
-
-    Public Property ResultValue As String Implements ICOVID.ResultValue
-        Get
-            Throw New NotImplementedException()
-        End Get
-        Set(value As String)
-            Throw New NotImplementedException()
-        End Set
-    End Property
-
-    Public Sub leiaArvS(ByRef strSisendDate As String) Implements ICOVID.leiaArvS
-        request = DirectCast(WebRequest.Create("https://opendata.digilugu.ee/opendata_covid19_tests_total.json"), HttpWebRequest)
-        response = DirectCast(request.GetResponse(), HttpWebResponse)
-        reader = New StreamReader(response.GetResponseStream())
-        jsonString = reader.ReadToEnd()
+    Public Sub leiaArvS(ByRef strSisendDate As String, ByRef strSisendMaakond As String) Implements ICOVID.leiaArvS
         AntudDate = strSisendDate
-        Dim objectList = JsonConvert.DeserializeObject(Of List(Of Data))(jsonString)
-        Dim foundItem = objectList.Where(Function(__) __.StatisticsDate = AntudDate).FirstOrDefault()
-        TotalCasesValue = foundItem.TotalCases
-        DailyCasesValue = foundItem.DailyCases
+        AntudMaakond = strSisendMaakond
+
+        If strSisendMaakond = "Eesti" Then
+            request = DirectCast(WebRequest.Create("https://opendata.digilugu.ee/opendata_covid19_tests_total.json"), HttpWebRequest)
+            response = DirectCast(request.GetResponse(), HttpWebResponse)
+            reader = New StreamReader(response.GetResponseStream())
+            jsonString = reader.ReadToEnd()
+
+            Dim objectList = JsonConvert.DeserializeObject(Of List(Of Data))(jsonString)
+            Dim foundItem = objectList.Where(Function(__) __.StatisticsDate = AntudDate).FirstOrDefault()
+            TotalCasesValue = foundItem.TotalCases
+            DailyCasesValue = foundItem.DailyCases
+            TotalCasesLast14DValue = foundItem.TotalCasesLast14D
+            PerPopulationValue = foundItem.PerPopulation
+
+            NextDayValue = foundItem.TotalCasesLast14D / 14
+
+
+        ElseIf strSisendMaakond IsNot "Eesti" Then
+            request = DirectCast(WebRequest.Create("https://opendata.digilugu.ee/opendata_covid19_test_county_all.json"), HttpWebRequest)
+            response = DirectCast(request.GetResponse(), HttpWebResponse)
+            reader = New StreamReader(response.GetResponseStream())
+            Dim jsonString As String
+            jsonString = reader.ReadToEnd()
+
+            Dim objectList = JsonConvert.DeserializeObject(Of List(Of Data))(jsonString)
+            Dim foundItem = objectList.Where(Function(__) __.StatisticsDate = AntudDate And __.County = AntudMaakond And __.ResultValue = "P").FirstOrDefault
+            TotalCasesValue = foundItem.TotalCases
+            DailyCasesValue = foundItem.DailyCases
+            TotalCasesLast14DValue = vbNull
+            PerPopulation = vbNull
+        End If
+
     End Sub
 
-    Public Function leiaArvF() As Integer Implements ICOVID.leiaArvF
-        Throw New NotImplementedException()
-    End Function
 End Class
